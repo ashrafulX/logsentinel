@@ -34,20 +34,35 @@ overkill for a single server or small team. LogSentinel takes the opposite appro
 
 ## ⚙️ Installation
 
+### Command Line
+
 ```bash
 git clone git@github.com:ashrafulX/logsentinel.git
 cd logsentinel
 python3 -m venv venv
 source venv/bin/activate    # Windows: venv\Scripts\activate
-pip install -r requirements.txt   # if any dependencies exist
+pip install -r requirements.txt
 ```
 
-No external dependencies are required for the core functionality — 
-it runs on the Python standard library alone.
+### Web Interface
+
+```bash
+git clone git@github.com:ashrafulX/logsentinel.git
+cd logsentinel
+python3 -m venv venv
+source venv/bin/activate    # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+Then open `http://127.0.0.1:8000/` in your browser.
 
 ---
 
 ## 🚀 Usage
+
+### Command Line
 
 Run it against a log file directly:
 
@@ -67,7 +82,14 @@ python logsentinel/main.py
 |--------------------------|-----------------------------------------------|
 | `--log-file`             | Path to the log file to analyze              |
 | `--output-format`        | `text` (default) or `json`                   |
-| `--severity-threshold`   | Minimum severity level to report              |
+| `--severity-threshold`   | Minimum failed attempts to trigger an alert  |
+
+### Web Interface
+
+1. Open `http://127.0.0.1:8000/`
+2. Select a CSV authentication log file
+3. Click **Analyze Logs**
+4. Review the analysis results on the same page
 
 ---
 
@@ -89,17 +111,31 @@ Flagged events: 1
 
 ```
 logsentinel/
+├── config/
+│   ├── settings.py
+│   ├── urls.py
+│   ├── asgi.py
+│   └── wsgi.py
+├── analyzer/
+│   ├── forms.py
+│   ├── views.py
+│   ├── urls.py
+│   └── tests.py
 ├── logsentinel/
-│   ├── main.py
 │   ├── parser.py
 │   ├── detector.py
 │   └── report.py
+├── templates/
+│   └── analyzer/
+│       └── index.html
 ├── sample_logs/
 │   └── authentication_logs.csv
 ├── tests/
 │   ├── test_detector.py
 │   ├── test_detector_pytest.py
 │   └── test_parser.py
+├── manage.py
+├── requirements.txt
 ├── LICENSE
 └── README.md
 ```
@@ -110,6 +146,28 @@ logsentinel/
 
 ```bash
 python -m pytest
+python manage.py test analyzer.tests -v 2
+```
+
+---
+
+## 📄 CSV Format
+
+The expected CSV columns are:
+
+| Column       | Description                          |
+|--------------|--------------------------------------|
+| `timestamp`  | Date and time of the event           |
+| `user`       | Username involved in the event       |
+| `ip_address` | Source IP address                    |
+| `status`     | `FAILED` or `SUCCESS`                |
+
+Example:
+
+```csv
+timestamp,user,ip_address,status
+2026-07-10 08:15:21,john,192.168.1.10,FAILED
+2026-07-10 08:16:15,john,192.168.1.10,SUCCESS
 ```
 
 ---

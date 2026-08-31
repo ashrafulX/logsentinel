@@ -16,11 +16,14 @@ def detect_failed_logins(events):
         int: Total number of failed login attempts.
     """
 
-    return sum(
-        1
-        for event in events
-        if event["status"].strip().upper() == "FAILED"
-    )
+    count = 0
+
+    for event in events:
+        status = event.get("status")
+        if status and status.strip().upper() == "FAILED":
+            count += 1
+
+    return count
 
 
 def detect_brute_force(events, threshold=5):
@@ -38,13 +41,11 @@ def detect_brute_force(events, threshold=5):
     failed_attempts = defaultdict(int)
 
     for event in events:
-        status = event["status"].strip().upper()
-
-        if status == "FAILED":
-            key = (
-                event["user"].strip(),
-                event["ip_address"].strip()
-            )
+        status = event.get("status")
+        if status and status.strip().upper() == "FAILED":
+            user = (event.get("user") or "").strip()
+            ip_address = (event.get("ip_address") or "").strip()
+            key = (user, ip_address)
             failed_attempts[key] += 1
 
     alerts = []
