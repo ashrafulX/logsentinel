@@ -1,0 +1,17 @@
+========== SECURITY SUMMARY ==========
+Total Events       : 15
+Successful Logins  : 5
+Failed Logins      : 10
+Security Alerts    : 1
+======================================
+
+========== HIGH-RISK ALERTS ==========
+
+Alert #1
+User               : admin
+IP Address         : 10.0.0.5
+Failed Attempts    : 5
+Risk Level         : HIGH
+Reason             : 5 failed login attempts detected for user 'admin' from 10.0.0.5.
+
+======================================
