@@ -1,196 +1,39 @@
 # LogSentinel 🛡️
 
-**A lightweight Python tool for spotting suspicious activity in your system logs.**
+**A lightweight Python + Django tool for spotting suspicious activity in authentication logs.**
 
-LogSentinel scans authentication and access logs to flag patterns that usually mean 
-trouble — repeated failed logins, brute-force attempts, and other red flags a SOC 
-analyst would want to catch early. Built for anyone who wants quick, no-fuss log 
-triage without spinning up a full SIEM stack.
+LogSentinel scans authentication logs (CSV format) and flags patterns that usually mean trouble — repeated failed logins and brute-force attempts — the kind of thing a SOC analyst wants to catch early. It ships two ways to run it: a **command-line tool** for quick local scans, and a **Django web app** with a drag-and-drop upload UI for visual analysis in the browser.
+
+![LogSentinel Landing Page](screenshots/landingpage.png)
 
 ---
 
 ## ✨ Why LogSentinel?
 
-Most log-monitoring tools are heavyweight, require external services, or are 
-overkill for a single server or small team. LogSentinel takes the opposite approach:
+Most log-monitoring stacks are heavyweight, need external services, or are overkill for a single server or small team. LogSentinel keeps things simple:
 
-- **Zero external dependencies** — runs with just the Python standard library
-- **Fast to set up** — clone, run, done
-- **Readable output** — findings are presented in plain, actionable language
-- **Extensible** — add your own detection rules with minimal code
-
----
-
-## 🔍 What It Detects
-
-| Pattern                        | Description                                      |
-|--------------------------------|---------------------------------------------------|
-| Repeated failed logins          | Flags accounts with multiple failed auth attempts |
-| Brute-force indicators          | Detects rapid-fire login attempts from one source |
-| Suspicious IP activity          | Highlights IPs behind unusual login patterns      |
-| Off-hours access attempts       | (extendable) flags logins outside expected hours  |
+- **Minimal dependencies** — the core detection engine only uses Python's standard library
+- **Two interfaces** — a CLI for scripting/automation, and a web UI for point-and-click analysis
+- **Fast to set up** — clone, install, run
+- **Readable output** — findings are shown in plain, actionable language
+- **Extensible** — the detection logic lives in a few small, well-documented modules
 
 ---
 
-## ⚙️ Installation
+## 🔍 How It Works
 
-### Command Line
+LogSentinel's core pipeline lives in the `logsentinel/` package and runs in three steps:
 
-```bash
-git clone git@github.com:ashrafulX/logsentinel.git
-cd logsentinel
-python3 -m venv venv
-source venv/bin/activate    # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
+1. **Parse** (`parser.py`) — reads the CSV log file, strips a BOM if present, normalizes column names, skips empty rows, and validates that the required columns (`timestamp`, `user`, `ip_address`, `status`) exist. If anything's missing, it raises a clear error instead of failing silently.
 
-### Web Interface
+2. **Detect** (`detector.py`) — runs two checks over the parsed events:
+   - `detect_failed_logins()` counts every event with `status = FAILED`.
+   - `detect_brute_force()` groups failed attempts by `(user, ip_address)` pair and flags any combination that hits a threshold (default: **5 failed attempts**) as a `HIGH` risk alert, complete with a human-readable reason.
 
-```bash
-git clone git@github.com:ashrafulX/logsentinel.git
-cd logsentinel
-python3 -m venv venv
-source venv/bin/activate    # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
-```
+3. **Report** (`report.py`) — takes the totals and alerts and builds a formatted text summary, which is both printed to the console and saved to a report file.
 
-Then open `http://127.0.0.1:8000/` in your browser.
-
----
-
-## 🚀 Usage
-
-### Command Line
-
-Run it against a log file directly:
-
-```bash
-python logsentinel/main.py --log-file /path/to/auth.log
-```
-
-Or use the bundled sample log to try it out immediately:
-
-```bash
-python logsentinel/main.py
-```
-
-### Options
-
-| Flag                    | Description                                  |
-|--------------------------|-----------------------------------------------|
-| `--log-file`             | Path to the log file to analyze              |
-| `--output-format`        | `text` (default) or `json`                   |
-| `--severity-threshold`   | Minimum failed attempts to trigger an alert  |
-
-### Web Interface
-
-1. Open `http://127.0.0.1:8000/`
-2. Select a CSV authentication log file
-3. Click **Analyze Logs**
-4. Review the analysis results on the same page
-
----
-
-## 📋 Example Output
-
-```
-[LogSentinel Report]
-Suspicious IP: 192.168.1.45
-Failed attempts: 7
-Status: FLAGGED — possible brute-force
-
-Total events scanned: 320
-Flagged events: 1
-```
+The **web app** (`analyzer/` Django app) wraps this exact same pipeline behind a browser UI: you upload a CSV, Django saves it to a temp file, runs it through `parser.py` and `detector.py`, and renders the results (total events, successful/failed counts, and any brute-force alerts) directly on the page — no page reload, no separate report file needed.
 
 ---
 
 ## 🗂️ Project Structure
-
-```
-logsentinel/
-├── config/
-│   ├── settings.py
-│   ├── urls.py
-│   ├── asgi.py
-│   └── wsgi.py
-├── analyzer/
-│   ├── forms.py
-│   ├── views.py
-│   ├── urls.py
-│   └── tests.py
-├── logsentinel/
-│   ├── parser.py
-│   ├── detector.py
-│   └── report.py
-├── templates/
-│   └── analyzer/
-│       └── index.html
-├── sample_logs/
-│   └── authentication_logs.csv
-├── tests/
-│   ├── test_detector.py
-│   ├── test_detector_pytest.py
-│   └── test_parser.py
-├── manage.py
-├── requirements.txt
-├── LICENSE
-└── README.md
-```
-
----
-
-## 🧪 Running Tests
-
-```bash
-python -m pytest
-python manage.py test analyzer.tests -v 2
-```
-
----
-
-## 📄 CSV Format
-
-The expected CSV columns are:
-
-| Column       | Description                          |
-|--------------|--------------------------------------|
-| `timestamp`  | Date and time of the event           |
-| `user`       | Username involved in the event       |
-| `ip_address` | Source IP address                    |
-| `status`     | `FAILED` or `SUCCESS`                |
-
-Example:
-
-```csv
-timestamp,user,ip_address,status
-2026-07-10 08:15:21,john,192.168.1.10,FAILED
-2026-07-10 08:16:15,john,192.168.1.10,SUCCESS
-```
-
----
-
-## 🛣️ Roadmap
-
-- [ ] Support for Apache/Nginx access logs
-- [ ] HTML report export
-- [ ] Configurable detection rules via YAML
-- [ ] Slack/webhook alerting for flagged events
-
----
-
-## 🙏 Credits
-
-This project was originally inspired by 
-[ThePreacherMan's python-soc-log-analyzer](https://github.com/ThePreacherMan/python-soc-log-analyzer). 
-LogSentinel rebuilds the core idea with a refreshed structure, new features, and 
-ongoing extensions, maintained by **Ashraful** ([@ashrafulX](https://github.com/ashrafulX)).
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file 
-for details.
